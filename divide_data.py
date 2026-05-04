@@ -4,17 +4,36 @@ from PIL import Image
 from pathlib import Path
 
 
+
 def divide_pic(img):
-    """Découpe une image en 5 zones : 4 joueurs + centre."""
+    """Découpe une image en 5 zones : 4 joueurs + centre, ET les redresse !"""
     H, W = img.shape[:2]
     h, w = H // 20, W // 20
     
+    # Player 1 (Bottom): Already facing the camera upright
+    p1 = img[15*h:, 5*w:16*w]
+    
+    # Player 2 (Right): Player faces left. Rotate 90° Clockwise
+    p2 = img[5*h:17*h, 14*w:]
+    p2 = np.rot90(p2, k=-1)
+    
+    # Player 3 (Top): Player faces down. Rotate 180°
+    p3 = img[:6*h, 5*w:15*w]
+    p3 = np.rot90(p3, k=2)
+    
+    # Player 4 (Left): Player faces right. Rotate 90° Counter-Clockwise
+    p4 = img[5*h:18*h, :6*w]
+    p4 = np.rot90(p4, k=1)
+    
+    # Center Card: Usually upright relative to the camera
+    center = img[8*h:14*h, 8*w:12*w]
+    
     return {
-        'p1': img[15*h:,5*w:16*w],          # bas
-        'p2': img[5*h:17*h, 14*w:],          # droite
-        'p3': img[:6*h, 5*w:15*w],            # haut
-        'p4': img[5*h:18*h, :6*w],            # gauche
-        'center': img[8*h:14*h,8*w:12*w], # centre
+        'p1': p1,
+        'p2': p2,
+        'p3': p3,
+        'p4': p4,
+        'center': center
     }
 
 
