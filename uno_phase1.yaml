@@ -1,0 +1,5 @@
+path: C:/absolute/path/to/uno_dataset
+train: images/train
+val: images/val  # <--- Update this!
+nc: 55
+# ... your class names ...

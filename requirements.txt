@@ -1,0 +1,12 @@
+# --- Core Deep Learning & YOLO ---
+ultralytics==8.2.0        # The official YOLOv8 library (handles PyTorch automatically)
+
+# --- Image Processing & Data Augmentation ---
+opencv-python>=4.8.0      # For reading, cropping, and saving the images
+albumentations>=1.4.0     # The best library for spatial/color augmentations
+numpy>=1.26.0             # Core math and matrix operations
+
+# --- Utilities ---
+tqdm>=4.66.0              # Progress bars for your long data generation loops
+PyYAML>=6.0               # To programmatically write your YOLO dataset.yaml files
+matplotlib>=3.8.0         # Great for visualizing your 5-zone crops to ensure they look right
