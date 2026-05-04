@@ -11,27 +11,26 @@ from tqdm import tqdm
 from model import UnoCountingResNet
 
 # --- CONFIGURATION ---
-REAL_DATA_DIR = "data/real_hands_cropped"  # Folder containing your 1000 real cropped hands
-LABELS_CSV = "data/real_hands_labels.csv"  # CSV mapping images to cards
+# Pointing to the massive 5,000 image dataset we just generated!
+REAL_DATA_DIR = "data/train_augmented"      
+LABELS_CSV = "augmented_hands_labels.csv"   
 PHASE1_WEIGHTS = "best_phase1_resnet.pth"
 
 BATCH_SIZE = 32        # Smaller batch size for fine-tuning
-EPOCHS = 100           
-PATIENCE = 10          
-LEARNING_RATE = 1e-4   # 🚨 10x SMALLER than Phase 1 to prevent destroying learned weights
+EPOCHS = 100           # Let it run wild
+PATIENCE = 10          # EARLY STOPPING: Stops if no improvement after 10 epochs
+LEARNING_RATE = 1e-4   # 10x smaller than Phase 1 to protect learned weights
 NUM_CLASSES = 56       
 MAX_COPIES = 6         
 
-# Define the exact 56 classes to ensure consistent indexing
-# (Make sure this list exactly matches the alphabetical folder names from Phase 1!)
-CLASS_NAMES = sorted([
-    # Add your 54 card names here, e.g., 'b_0', 'b_1', ..., 'wild', 'wild_draw_4'
-    # Plus your tokens: 'black_token', 'yellow_token'
-]) 
-# For safety in this script, we'll generate a dummy list if you haven't filled it yet.
+# 🚨 CRITICAL: Populate this with your EXACT 56 class names in alphabetical order!
+# Example: ['b_0', 'b_1', ..., 'black_token', ..., 'yellow_token']
+CLASS_NAMES = [
+    # TODO: Paste your 56 class strings here
+] 
 if not CLASS_NAMES:
-    print("⚠️ WARNING: CLASS_NAMES list is empty. Please populate it with your exact 56 class strings!")
-    CLASS_NAMES = [f"class_{i}" for i in range(56)] # Replace this!
+    print("⚠️ WARNING: CLASS_NAMES is empty. Generating dummies to prevent crash.")
+    CLASS_NAMES = [f"class_{i}" for i in range(56)]
 
 # --- 1. REAL HAND DATASET LOADER ---
 class UnoRealHandDataset(Dataset):
@@ -46,8 +45,6 @@ class UnoRealHandDataset(Dataset):
         return len(self.data_frame)
 
     def __getitem__(self, idx):
-        # Assuming CSV has columns: 'filename' and 'cards'
-        # Example 'cards' cell: "r_7;b_draw_2;yellow_token"
         img_name = os.path.join(self.img_dir, str(self.data_frame.iloc[idx]['filename']))
         image = Image.open(img_name).convert('RGB')
         
@@ -61,8 +58,6 @@ class UnoRealHandDataset(Dataset):
             for card in card_list:
                 card = card.strip()
                 if card in self.class_to_idx:
-                    # Increment the count for this specific card!
-                    # If there are two 'b_skip's, this index becomes 2.
                     target[self.class_to_idx[card]] += 1
                 
         if self.transform:
@@ -70,18 +65,14 @@ class UnoRealHandDataset(Dataset):
             
         return image, target
 
-# --- MAIN EXECUTION BLOCK ---
+# --- MAIN EXECUTION BLOCK (Windows Safe) ---
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"🚀 Fine-Tuning on device: {device}")
 
-    # 🚨 LIGHT AUGMENTATIONS ONLY 🚨
-    # Because the Kaggle test set is clean, we only apply gentle tweaks 
-    # to simulate minor camera positioning and lighting differences.
+    # No more ColorJitter! Just resize, tensor, and normalize.
     train_transform = transforms.Compose([
         transforms.Resize((224, 224)),
-        transforms.RandomRotation(degrees=10),                 # Slight camera tilt
-        transforms.ColorJitter(brightness=0.2, contrast=0.2),  # Slight lighting changes
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
@@ -92,15 +83,14 @@ def main():
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    # Split your 1000 real images into Train (800) and Val (200) CSVs beforehand, 
-    # or just use a standard random split here. For simplicity, assuming one train CSV here.
     full_dataset = UnoRealHandDataset(LABELS_CSV, REAL_DATA_DIR, CLASS_NAMES, transform=train_transform)
     
+    # 80/20 Train-Validation Split
     train_size = int(0.8 * len(full_dataset))
     val_size = len(full_dataset) - train_size
     train_dataset, val_dataset = torch.utils.data.random_split(full_dataset, [train_size, val_size])
     
-    # Overwrite the validation dataset's transform to remove random augmentations
+    # Ensure validation uses the identical strict transform
     val_dataset.dataset.transform = val_transform
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4, pin_memory=True)
@@ -150,6 +140,7 @@ def main():
             
         avg_train_loss = running_loss / len(train_loader)
         
+        # Validation
         model.eval()
         val_loss = 0.0
         correct_counts = 0
@@ -175,6 +166,7 @@ def main():
         
         scheduler.step()
         
+        # 🚨 EARLY STOPPING LOGIC 🚨
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             epochs_no_improve = 0  
@@ -185,7 +177,7 @@ def main():
             print(f"⚠️ Validation loss did not improve. Patience: {epochs_no_improve}/{PATIENCE}")
             
             if epochs_no_improve >= PATIENCE:
-                print(f"\n🛑 Early stopping triggered!")
+                print(f"\n🛑 Early stopping triggered! Model hasn't improved in {PATIENCE} epochs.")
                 break 
 
     print("\n🎉 Phase 4 Fine-Tuning Complete! Best model is saved as 'best_finetuned_resnet.pth'")
