@@ -9,15 +9,16 @@ from tqdm import tqdm
 # --- CONFIGURATION ---
 SOURCE_CARDS_DIR = "data/single_cards"
 BACKGROUNDS_DIR = "data/backgrounds"
-OUTPUT_DATASET = "uno_dataset"
-SAMPLES_PER_CARD = 200     # Base number of samples for regular cards
-TOKEN_MULTIPLIER = 3       # Generate 3x as many samples for tokens
+OUTPUT_DATASET = "uno_classification_dataset" # Renamed
+SAMPLES_PER_CARD = 200     
+TOKEN_MULTIPLIER = 3       
 CANVAS_SIZE = 640          
 CARD_MAX_DIM = 250         
 
-# --- 1. SETUP ALBUMENTATIONS PIPELINE (TUNED DOWN) ---
+# --- 1. SETUP ALBUMENTATIONS PIPELINE (CLASSIFICATION ONLY) ---
+# 🚨 REMOVED: bbox_params. We only augment the image now!
 transform = A.Compose([
-    # Spatial transforms: Keep cards a reasonable size and closer to center
+    # Spatial transforms
     A.Affine(
         scale=(0.6, 1.1),                                             
         translate_percent={"x": (-0.20, 0.20), "y": (-0.20, 0.20)},   
@@ -26,12 +27,12 @@ transform = A.Compose([
     ),
     A.Perspective(scale=(0.02, 0.06), p=0.3),                         
     
-    # Pixel transforms: Subtle lighting and camera sensor simulation
+    # Pixel transforms
     A.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.1, hue=0.02, p=0.6),
     A.GaussNoise(p=0.2),                                              
     A.MotionBlur(blur_limit=3, p=0.1),                                
 
-    # Occlusion: Simulate thumbs/other cards covering parts of the card
+    # Occlusion: Crucial for simulating fanned hands later
     A.CoarseDropout(
         num_holes_range=(1, 3),                                       
         hole_height_range=(10, 25),                                   
@@ -39,7 +40,7 @@ transform = A.Compose([
         fill_mask=0, 
         p=0.4                                                         
     ),
-], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels'], min_visibility=0.4))
+])
 
 # --- 2. LOAD BACKGROUNDS INTO MEMORY ---
 bg_paths = glob(os.path.join(BACKGROUNDS_DIR, "*.*"))
@@ -67,55 +68,36 @@ def generate_background():
     canvas = np.clip(canvas.astype(np.int16) + shift, 0, 255).astype(np.uint8)
     return canvas
 
-def create_class_mapping(card_paths):
-    """Assigns an integer ID to each card name and saves a YAML snippet."""
-    classes = sorted(list(set([os.path.basename(p).split('.')[0] for p in card_paths])))
-    mapping = {name: idx for idx, name in enumerate(classes)}
-    
-    with open(os.path.join(OUTPUT_DATASET, "classes_snippet.txt"), "w") as f:
-        f.write("names:\n")
-        for name, idx in mapping.items():
-            f.write(f"  {idx}: '{name}'\n")
-            
-    print(f"✅ Mapped {len(classes)} classes. Snippet saved to {OUTPUT_DATASET}/classes_snippet.txt")
-    return mapping
-
 # --- MAIN EXECUTION ---
 def main():
-    train_img_dir = os.path.join(OUTPUT_DATASET, "images", "train")
-    train_lbl_dir = os.path.join(OUTPUT_DATASET, "labels", "train")
-    val_img_dir = os.path.join(OUTPUT_DATASET, "images", "val")
-    val_lbl_dir = os.path.join(OUTPUT_DATASET, "labels", "val")
+    # 🚨 CHANGED: We now rely purely on train/val folders
+    base_train_dir = os.path.join(OUTPUT_DATASET, "train")
+    base_val_dir = os.path.join(OUTPUT_DATASET, "val")
     
-    os.makedirs(train_img_dir, exist_ok=True)
-    os.makedirs(train_lbl_dir, exist_ok=True)
-    os.makedirs(val_img_dir, exist_ok=True)
-    os.makedirs(val_lbl_dir, exist_ok=True)
-
     card_paths = glob(os.path.join(SOURCE_CARDS_DIR, "*.*"))
     if not card_paths:
         print(f"⚠️ FATAL: No cards found in {SOURCE_CARDS_DIR}!")
         return
 
-    class_mapping = create_class_mapping(card_paths)
     global_img_count = 0
-
-    # Wrap the loop in a tqdm progress bar
     pbar = tqdm(card_paths, desc="Generating Phase 1 Dataset")
     
     for card_path in pbar:
+        # Extract the class name directly from the file name
         card_name = os.path.basename(card_path).split('.')[0]
-        class_id = class_mapping[card_name]
         
-        # --- 🚨 NEW: COMBAT CLASS IMBALANCE FOR TOKENS 🚨 ---
-        # If the file name contains 'token', boost its generation count
+        # Create class-specific directories for PyTorch ImageFolder
+        class_train_dir = os.path.join(base_train_dir, card_name)
+        class_val_dir = os.path.join(base_val_dir, card_name)
+        os.makedirs(class_train_dir, exist_ok=True)
+        os.makedirs(class_val_dir, exist_ok=True)
+        
         if "token" in card_name.lower():
             target_samples = SAMPLES_PER_CARD * TOKEN_MULTIPLIER
             pbar.set_postfix({"Boosting": f"{card_name} ({target_samples}x)"})
         else:
             target_samples = SAMPLES_PER_CARD
             pbar.set_postfix({"Current": card_name})
-        # ----------------------------------------------------
         
         card_img = cv2.imread(card_path, cv2.IMREAD_UNCHANGED)
         if card_img is None: continue
@@ -143,38 +125,22 @@ def main():
 
         start_y = (CANVAS_SIZE - c_h) // 2
         start_x = (CANVAS_SIZE - c_w) // 2
-        
-        center_x, center_y = 0.5, 0.5
-        norm_w, norm_h = c_w / CANVAS_SIZE, c_h / CANVAS_SIZE
-        original_bbox = [center_x, center_y, norm_w, norm_h]
 
         generated = 0
-        # Loop now uses the dynamic target_samples
         while generated < target_samples:
             bg = generate_background()
             bg[start_y:start_y+c_h, start_x:start_x+c_w] = card_img
             
-            try:
-                augmented = transform(image=bg, bboxes=[original_bbox], class_labels=[class_id])
-            except ValueError:
-                continue
-            
-            if len(augmented['bboxes']) == 0:
-                continue
-                
+            # 🚨 CHANGED: Pass ONLY the image to Albumentations
+            augmented = transform(image=bg)
             aug_img = augmented['image']
-            aug_bbox = augmented['bboxes'][0]
             
+            # Random split for Train/Val
             is_val = random.random() < 0.2
-            current_img_dir = val_img_dir if is_val else train_img_dir
-            current_lbl_dir = val_lbl_dir if is_val else train_lbl_dir
+            current_dir = class_val_dir if is_val else class_train_dir
             
             img_filename = f"{card_name}_{global_img_count}.jpg"
-            cv2.imwrite(os.path.join(current_img_dir, img_filename), aug_img)
-            
-            txt_filename = f"{card_name}_{global_img_count}.txt"
-            with open(os.path.join(current_lbl_dir, txt_filename), "w") as f:
-                f.write(f"{class_id} {aug_bbox[0]:.6f} {aug_bbox[1]:.6f} {aug_bbox[2]:.6f} {aug_bbox[3]:.6f}\n")
+            cv2.imwrite(os.path.join(current_dir, img_filename), aug_img)
             
             generated += 1
             global_img_count += 1
