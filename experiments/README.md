@@ -91,7 +91,7 @@ pre-trained from scratch on the two-card overlap set (that recipe is now
 surviving version of that fine-tuning.
 
 **Notes:**
-- In this version, stage 0 builds a 17 x 6 head with dropout. The surviving
+- In this version, stage 0 builds a 17 x 6 head with dropout. The saved
   `best_step0_grayscale.pth` (17 x 5, no dropout) came from an earlier version of the script.
 - Stage 1 uses `StepLR(step_size=5, gamma=0.1)`: the learning rate is divided by 10 every
   5 epochs, so training has practically stopped after about 20 of its 300 epochs.
@@ -203,8 +203,8 @@ the previous one. Settings:
 
 It writes `best_phase4_stage{1-4}.pth`.
 
-**Outcome:** the four checkpoints exist in the original project, but no evaluation of
-them was kept.
+**Outcome:** the four checkpoints were saved (they are not in this repository), but no
+evaluation of them was kept.
 
 **Why it was dropped:** 648 training crops (324 distinct crops plus a rotated, rescaled
 copy of each) from 81 photos are far too few to train a ResNet-18 from scratch, as the

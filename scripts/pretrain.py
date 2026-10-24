@@ -57,7 +57,7 @@ def main(argv=None):
              "val_csv": args.data / "synthetic_val.csv", "val_dir": args.data / "val"}
     for path in files.values():
         if not path.exists():
-            sys.exit(f"error: {path} not found")
+            sys.exit(f"error: {path} not found (scripts/generate_synthetic.py writes it)")
 
     seed_everything(args.seed)
     device = pick_device(args.device)

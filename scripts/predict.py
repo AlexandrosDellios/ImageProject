@@ -29,6 +29,8 @@ def main(argv=None):
     for path in (args.images, args.weights):
         if not path.exists():
             sys.exit(f"error: {path} not found")
+    if not args.out.parent.is_dir():
+        sys.exit(f"error: {args.out.parent} not found (the folder for --out)")
 
     device = pick_device(args.device)
     print(f"device: {device}")

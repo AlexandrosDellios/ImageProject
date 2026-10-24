@@ -156,7 +156,7 @@ def augment_card(card: Image.Image, width: int, height: int, rng: random.Random,
     record_stage(stages, f"{label}: blur and feather", card)
 
     if rng.random() < aug.crunch_prob:
-        # Real zone crops are 700-2200 px wide and get resized to 336: mimic that loss of detail.
+        # Real zone crops are 800-2200 px on their long side and get resized to 336: mimic that loss of detail.
         factor = rng.uniform(*aug.crunch_factor)
         small = card.resize((max(10, int(card.width / factor)), max(10, int(card.height / factor))),
                             Image.Resampling.NEAREST)

@@ -71,7 +71,9 @@ def predict_image(model: torch.nn.Module, path: Union[str, Path], device: torch.
 
 
 def list_images(folder: Union[str, Path]) -> List[Path]:
-    return sorted(p for p in Path(folder).iterdir() if p.suffix.lower() in IMAGE_SUFFIXES)
+    """The photos in `folder`, sorted; hidden files (macOS "._" copies) are skipped."""
+    return sorted(p for p in Path(folder).iterdir()
+                  if p.suffix.lower() in IMAGE_SUFFIXES and not p.name.startswith("."))
 
 
 def predict_folder(model: torch.nn.Module, folder: Union[str, Path], device: torch.device,

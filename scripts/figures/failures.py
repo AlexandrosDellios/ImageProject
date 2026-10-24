@@ -38,6 +38,9 @@ def main(argv=None):
     parser.add_argument("--device", default=None)
     args = parser.parse_args(argv)
     style.set_font(args.font)
+    for photo_id, *_ in CASES:
+        if not (RAW / "test_images" / f"{photo_id}.jpg").exists():
+            sys.exit(f"error: {RAW / 'test_images' / photo_id}.jpg not found")
 
     device = pick_device(args.device)
     model = load_model(WEIGHTS, device)

@@ -3,10 +3,25 @@ data/
 
 # Training and evaluation outputs
 runs/
+# Output folders of the usage examples in scripts/figures/ (reading.py, synthesis.py)
+/out/
+/site/
 *.pth
 !weights/uno_resnet18_cbam.pth
 submission.csv
 !results/submission.csv
+
+# The archived experiments (experiments/README.md) read and write in the working directory,
+# multistage/ in its own folder: uno_* datasets, label CSVs derived from the course data,
+# zone images, diagnostics, YOLO weights
+uno_*/
+!/uno_vision/
+diagnostics*/
+*.pt
+/*.csv
+/*.jpg
+experiments/**/*.csv
+experiments/**/*.jpg
 
 # Python
 __pycache__/

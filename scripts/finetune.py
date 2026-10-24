@@ -84,7 +84,7 @@ def main(argv=None):
              "val_csv": args.data / "real_val.csv", "val_dir": args.data / "real_val"}
     for path in files.values():
         if not path.exists():
-            sys.exit(f"error: {path} not found")
+            sys.exit(f"error: {path} not found (scripts/prepare_real_data.py writes it)")
 
     seed_everything(args.seed)
     device = pick_device(args.device)

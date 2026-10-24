@@ -1,8 +1,10 @@
 # Python 3.9 or newer. On a CUDA machine, install the matching torch build first
 # (https://pytorch.org/get-started/locally/); on a Mac the default wheels use the GPU (MPS).
+# Intel Macs: torch stops at 2.2 (Python 3.12 or older), which needs NumPy 1.x.
 torch>=2.2
 torchvision>=0.17
-numpy>=1.24
+numpy>=1.24,<2; platform_system == "Darwin" and platform_machine == "x86_64"
+numpy>=1.24; platform_system != "Darwin" or platform_machine != "x86_64"
 pandas>=1.5
 pillow>=10.0
 matplotlib>=3.5

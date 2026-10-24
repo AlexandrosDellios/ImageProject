@@ -275,7 +275,8 @@ def main(argv=None):
 
     for path in (args.weights, args.crops, args.labels):
         if not path.exists():
-            sys.exit(f"error: {path} not found")
+            hint = "" if path == args.weights else " (scripts/prepare_real_data.py writes it)"
+            sys.exit(f"error: {path} not found{hint}")
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     device = pick_device(args.device)

@@ -228,6 +228,12 @@ def main(argv=None):
     parser.add_argument("--font", default=None)
     parser.add_argument("--device", default=None)
     args = parser.parse_args(argv)
+    # Check the inputs before the minute of rendering.
+    photo = RAW / "test_images" / f"{args.photo}.jpg"
+    if not photo.exists():
+        sys.exit(f"error: {photo} not found")
+    if not shutil.which("ffmpeg"):
+        sys.exit("error: ffmpeg is needed to encode the animation")
 
     frames, last, state, reading = render(args.photo, args.device, args.font)
     encode(frames, args.out_dir, args.site_dir, args.gif_width)

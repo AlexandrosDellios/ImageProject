@@ -6,25 +6,34 @@ the pile, and whose turn it is.
 ![The model reading a test photo zone by zone](docs/figures/reading.gif)
 
 *The submitted model on a test photo it never saw. It reads 5 of the 6 cards and the turn;
-it misses the red 8 in the bottom hand.*
+it misses the red 8 in the bottom hand, although nothing covers it.*
 
 A team project (3 people) for EPFL's *Image Analysis and Pattern Recognition* course,
 spring 2026, scored as an in-class Kaggle competition. No pretrained weights: the network
-learns from synthetic tables first, then from a few dozen real photos.
+learns from synthetic images of overlapping cards first, then from 81 labelled real photos.
 
 ## Results
 
 - **75% on the course's Kaggle leaderboard**, scored on the test photos' hidden labels.
-- **Mean F1 0.737** over the 48 card classes present in 81 held-out real hand crops
-  (`python scripts/evaluate.py`). Counts are scored copy by copy: two red 5s predicted for
-  one is one hit and one false positive.
-- **Spread-out hands are read well; overlapping fans are not.** Cards that are mostly
-  hidden under others are the typical miss: on the held-out crops the model misses a card
-  (32 copies) more than twice as often as it invents one (14).
+- **Mean F1 0.737** over the 48 classes (47 card faces and the yellow token) present in the
+  81 real validation crops: 59 hands and 22 center piles (`python scripts/evaluate.py`,
+  after `scripts/prepare_real_data.py`; optimistic, see the notes). Counts are scored copy
+  by copy: two red 5s predicted for one is one hit and one false positive.
+- **It misses cards more often than it invents them.** On those crops it misses 32 of the
+  123 card copies and invents 16. Misses grow with the size of the hand, and a card mostly
+  hidden in a fan is the hardest case.
 - **11.4 M parameters**, trained from scratch. A photo takes about 0.25 s on a laptop GPU
   (Apple M2) and 0.4 s on its CPU, of which about 0.1 s is decoding the 10 MB JPEG.
 
+![Per-class F1 on the validation crops](docs/figures/f1_per_class.png)
+
+*Per-class F1 on the validation crops, sorted. Most classes have only 1 to 4 copies there,
+so single values are noisy; blue 2, blue 6 and red 7 are never found.*
+
 ![Two fanned hands: the cards read and the cards missed](docs/figures/failures.png)
+
+*Two fanned hands from test photos: what the model read and what it missed (checked by eye:
+the test labels are hidden).*
 
 ## How it works
 
@@ -58,17 +67,19 @@ images). First only the head is trained (warm-up), then the whole network (polis
 with early stopping on the validation loss.
 
 **6. Reading the table.** A hand lists its predicted cards. The active player is the one
-whose zone holds a token. The center card is the first card counted in the center zone, or,
-if none is, the class with the highest "exactly one copy" score, so every photo gets exactly
-one center card.
-
-![Per-class F1 on the held-out crops](docs/figures/f1_per_class.png)
+whose zone holds a token. The center card is the first card (in class order) counted in the
+center zone, or, if none is, the class with the highest "exactly one copy" score, so every
+photo gets exactly one center card.
 
 ![Grad-CAM: where the network looks](docs/figures/gradcam.png)
 
+*Grad-CAM (layer4) on three validation crops: the heat sits on the card being counted, a
+green skip under a +2 and a blue 8 next to a green one. For the turn token, cut off at the
+right edge, it sits on the cards instead.*
+
 ## Quick start
 
-Python 3.9 or newer.
+Python 3.9 or newer. Put the course photos in `data/raw/` first (see [Data](#data)).
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
@@ -100,24 +111,29 @@ and table patches the synthetic generator needs (see `assets/README.md`).
 ## Reproduce the pipeline
 
 ```bash
-python scripts/prepare_real_data.py      # labels, zone crops, train/val split -> data/processed/
-python scripts/generate_synthetic.py     # 10,000 + 2,000 two-card images -> data/synthetic/overlap/ (~4 min)
+python scripts/prepare_real_data.py      # labels, zone crops, train/val split -> data/processed/ (1.3 GB)
+python scripts/generate_synthetic.py     # 10,000 + 2,000 two-card images -> data/synthetic/overlap/ (~4 min, 0.75 GB)
 python scripts/pretrain.py               # synthetic pre-training -> runs/pretrain/best.pth
 python scripts/finetune.py --init runs/pretrain/best.pth   # real crops -> runs/finetune/best.pth
-python scripts/evaluate.py --weights runs/finetune/best.pth   # F1, error charts, Grad-CAM -> runs/evaluate/
+python scripts/evaluate.py --weights runs/finetune/best.pth --out-dir runs/evaluate_finetune   # F1, charts, Grad-CAM
 python scripts/predict.py --weights runs/finetune/best.pth --out my_submission.csv
 ```
 
-- Every script has `--help`. `--device` picks `cpu`, `cuda` or `mps` (default: the best
-  available); `--limit N` on the training scripts runs a quick smoke test on N images.
+- Every script has `--help`. The ones that run the network take `--device` (`cpu`, `cuda`
+  or `mps`; default: the best available); `--limit N` on the training scripts runs a quick smoke test on N images.
 - Pre-training is the long step: about 4 minutes per epoch on an Apple M2 GPU, up to 150
-  epochs with early stopping. A fine-tuning epoch takes about 15 s.
-- On macOS, `--num-workers 0` is usually as fast as worker processes and avoids their slow
-  shutdown.
+  epochs with early stopping. A fine-tuning epoch takes 10 to 30 s.
+- On macOS, `--num-workers 0` suits smoke tests: it skips the worker processes' slow start
+  and shutdown (30 to 40 s per run). For full runs keep the default 4 workers: without
+  them a pre-training epoch is about as fast, but a fine-tuning epoch takes up to twice as
+  long.
 - `python scripts/evaluate.py` with the included weights gives the 0.737 above;
-  `--gradcam-layer layer3` reproduces the Grad-CAM figure of the course report.
+  `--gradcam-layer layer3` uses the layer of the Grad-CAM figure in the course report (not
+  in this repository; its crops were picked at random, so the crops differ).
 - The figures in `docs/figures/` are made by `scripts/figures/` (each script's docstring
-  says how; `--font` takes a .ttf, these used Geist Mono).
+  says how). They read `data/raw/` and `data/processed/`, write into `docs/figures/` unless
+  given `--out-dir`, and the two animations need `ffmpeg`. `--font` takes a .ttf; these used
+  Geist Mono (without it, the labels fall back to DejaVu Sans Mono).
 
 ## Repository layout
 
@@ -150,14 +166,16 @@ docs/figures/             the figures in this README
 - **One fix in the recipe.** The old warm-up meant to train only the head, but its filter
   (`"fc" in name`) also trained CBAM's channel-attention layers. `scripts/finetune.py` trains
   only `fc.*` in the warm-up.
-- **The evaluation is optimistic.** The real crops are split by crop, not by photo, so other
-  zones of a validation photo can be in the training set.
+- **The evaluation is optimistic.** The 81 validation crops are also the ones whose
+  loss picked the checkpoint (early stopping). And the real crops are split by crop, not by
+  photo: each of the 56 photos behind the validation crops has other zones in training.
 - **Fixed zones.** The grid assumes the course's camera set-up. Zones overlap at the corners,
   so a card there can be counted in two hands, and a token placed outside every zone is
-  missed (the active player then defaults to P1).
-- **One token class in the labels.** The real labels mark every active hand with
-  `yellow_token`, also on tables where the token is black; the model learns the black one
-  from synthetic images only. Which token it sees does not matter for the turn.
+  missed (the active player then defaults to p1).
+- **One token class in the labels.** The course labels only name the active player, so the
+  crop labels mark that hand with `yellow_token`, also on the white-table photos, where the
+  token is black; the model learns the black one from synthetic images only. Which token
+  it sees does not matter for the turn.
 - **Grad-CAM layer.** `scripts/evaluate.py` explains the last residual stage (layer4) by
   default; the course report's figure came from layer3.
 - The earlier approaches (a YOLO detector, a colour-blind "shape" model, a curriculum by
