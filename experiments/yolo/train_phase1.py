@@ -1,11 +1,16 @@
+"""Archived, not maintained: train YOLOv8s from scratch on uno_dataset/ (uno_phase1.yaml).
+
+Needs ultralytics and a CUDA GPU (device=0). See experiments/README.md.
+"""
+
 from ultralytics import YOLO
 
 def main():
-    print("🚀 Initializing YOLOv8 Small FROM SCRATCH (Kaggle Compliant)...")
+    print("Initializing YOLOv8 Small FROM SCRATCH (Kaggle Compliant)...")
     
     model = YOLO('yolov8s.yaml')
 
-    print("🧠 Starting Phase 1 Training (Curriculum: Vocabulary)...")
+    print("Starting Phase 1 Training (Curriculum: Vocabulary)...")
     
     # Start the training loop
     results = model.train(
@@ -21,7 +26,7 @@ def main():
         workers=6                
     )
     
-    print("✅ Phase 1 Training Complete! Weights saved in uno_project/phase1_vocab/weights/best.pt")
+    print("Phase 1 Training Complete! Weights saved in uno_project/phase1_vocab/weights/best.pt")
 
 if __name__ == '__main__':
     # Required for Windows multiprocessing

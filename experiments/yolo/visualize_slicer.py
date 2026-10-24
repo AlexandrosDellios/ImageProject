@@ -1,3 +1,8 @@
+"""Archived, not maintained: draw the slicer.py zones on one photo (visualized_zones.jpg).
+
+See experiments/README.md.
+"""
+
 import cv2
 import os
 
@@ -26,7 +31,7 @@ COLORS = {
 
 def main():
     if not os.path.exists(SAMPLE_IMAGE):
-        print(f"⚠️ Could not find {SAMPLE_IMAGE}. Please update the filename!")
+        print(f"Could not find {SAMPLE_IMAGE}. Please update the filename!")
         return
 
     # Load the image
@@ -52,7 +57,7 @@ def main():
 
     # Save the output image
     cv2.imwrite(OUTPUT_IMAGE, img)
-    print(f"✅ Zones drawn successfully! Open '{OUTPUT_IMAGE}' to see your layout.")
+    print(f"Zones drawn successfully! Open '{OUTPUT_IMAGE}' to see your layout.")
 
 if __name__ == "__main__":
     main()

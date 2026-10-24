@@ -1,3 +1,11 @@
+"""Archived, not maintained: YOLOv8 training set made from the single card cut-outs.
+
+Pastes one card per 640x640 canvas tiled with table background, augments it with
+albumentations and writes YOLO box labels to uno_dataset/{images,labels}/{train,val}.
+Old paths, relative to the working directory: data/single_cards, data/backgrounds.
+See experiments/README.md.
+"""
+
 import cv2
 import os
 import random
@@ -44,7 +52,7 @@ transform = A.Compose([
 # --- 2. LOAD BACKGROUNDS INTO MEMORY ---
 bg_paths = glob(os.path.join(BACKGROUNDS_DIR, "*.*"))
 if not bg_paths:
-    print(f"⚠️ FATAL: No background patches found in {BACKGROUNDS_DIR}!")
+    print(f"FATAL: No background patches found in {BACKGROUNDS_DIR}!")
     exit()
 
 REAL_BACKGROUNDS = [cv2.imread(p) for p in bg_paths if cv2.imread(p) is not None]
@@ -77,7 +85,7 @@ def create_class_mapping(card_paths):
         for name, idx in mapping.items():
             f.write(f"  {idx}: '{name}'\n")
             
-    print(f"✅ Mapped {len(classes)} classes. Snippet saved to {OUTPUT_DATASET}/classes_snippet.txt")
+    print(f"Mapped {len(classes)} classes. Snippet saved to {OUTPUT_DATASET}/classes_snippet.txt")
     return mapping
 
 # --- MAIN EXECUTION ---
@@ -94,7 +102,7 @@ def main():
 
     card_paths = glob(os.path.join(SOURCE_CARDS_DIR, "*.*"))
     if not card_paths:
-        print(f"⚠️ FATAL: No cards found in {SOURCE_CARDS_DIR}!")
+        print(f"FATAL: No cards found in {SOURCE_CARDS_DIR}!")
         return
 
     class_mapping = create_class_mapping(card_paths)
@@ -107,7 +115,7 @@ def main():
         card_name = os.path.basename(card_path).split('.')[0]
         class_id = class_mapping[card_name]
         
-        # --- 🚨 NEW: COMBAT CLASS IMBALANCE FOR TOKENS 🚨 ---
+        # --- NEW: COMBAT CLASS IMBALANCE FOR TOKENS ---
         # If the file name contains 'token', boost its generation count
         if "token" in card_name.lower():
             target_samples = SAMPLES_PER_CARD * TOKEN_MULTIPLIER

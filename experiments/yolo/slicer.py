@@ -1,3 +1,10 @@
+"""Archived, not maintained: cut raw photos into 5 zones, to label card boxes by hand.
+
+Reads data/raw_images/*.jpg and writes data/to_be_labeled/<id>_<zone>.jpg. These zones are
+fixed fractions of the photo, without rotation; they are not the zones of the final
+pipeline (uno_vision/zones.py). See experiments/README.md.
+"""
+
 import cv2
 import os
 from glob import glob
@@ -24,4 +31,4 @@ for img_path in images:
     for zone, (x1p, x2p, y1p, y2p) in ZONES.items():
         crop = img[int(y1p*h):int(y2p*h), int(x1p*w):int(x2p*w)]
         cv2.imwrite(os.path.join(OUTPUT_DIR, f"{base_name}_{zone}.jpg"), crop)
-print(f"✅ Sliced {len(images)} images into {len(images)*5} crops ready for labeling!")
+print(f"Sliced {len(images)} images into {len(images)*5} crops ready for labeling!")
